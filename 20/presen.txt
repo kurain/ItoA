@@ -1,0 +1,304 @@
+*フィボナッチヒープ
+**二項ヒープの続き
+**お品書き
+-フィボナッチヒープの計算量
+-フィボナッチヒープの構造
+-各ヒープ操作
+-rubyで実装しました
+
+*計算量に優れる
+|手続き|2項|フィボナッチ|
+|Make-Heap|[tex:\Theta(1)]|[tex:\Theta(1)]|
+|Insert|[tex:\Theta(\lg n)]|[tex:\Theta(1)]|
+|Minimum|[tex:\Theta(\lg n)]|[tex:\Theta(1)]|
+|Extract-Min|[tex:\Theta(\lg n)]|[tex:\Theta(\lg n)]|
+|Union|[tex:\Theta(\lg n)]|[tex:\Theta(1)]|
+|Decrease-Key|[tex:\Theta(\lg n)]|[tex:\Theta(1)]|
+|Delete|[tex:\Theta(\lg n)]|[tex:\Theta(\lg n)]|
+ただし、2項は最悪時、フィボナッチはならし計算量
+
+*フィボナッチヒープの構造
+-絵を描く
+-双方向巡回リスト
+>|ruby|
+$p = {}        #parent へのポインタ
+$child = {}    #子へのポインタ
+$left = {}     #左側の兄弟へのポインタ
+$right = {}    #右側の兄弟へのポインタ
+$degree = {}   #次数
+$mark = {}     #接点の子になった後に子を失ったか？
+$min = {}      #最小接点を保持するポインタ
+$n = {}        #接点数を保持するポインタ
+$key = {}      #要素のキーを保持するポインタ
+||<
+
+*ポテンシャル関数と最大次数
+**ポテンシャル関数
+[tex:\Phi(H) = t(H) + 2m(H)]
+- [t(H)] Hに含まれる木の数 = 根の数
+- [m(H)] Hに含まれるマークされた接点の数
+
+**最大次数
+-上界 [tex: D(n)] が存在すると仮定する
+-マージ可能ヒープ操作のみ [tex: D(n) = \lfloor\lg n\rfloor]
+-- 20.2-3節で
+-Decrease-Key Deleteも含めても [tex: D(n) = O(\lg n)]
+-- 19.3節で
+
+*ヒープ操作の特徴
+-Delete Decrease-Key を含まなければ　順序なし2項木
+-前回の復習から 順序なし2項木は　[tex: D(n) = O(\lg n)]
+-複雑な操作を先送りすることで高速化をはかっている
+-Extract-Min 以外は最小接点が特に必要ない
+
+*Make-Fib-Heap
+-フィボナッチヒープの要素Hを割り当てる
+-接点数は0、最小接点はnil
+-ポテンシャル
+--[tex:\Phi(H) = t(H) + 2m(H) = 0 + 0 = 0]
+--ならしコストは[tex: O(1)]
+>|ruby|
+class FibHeap
+end
+def make_fib_heap
+  h = FibHeap.new
+  $min[h] = nil
+  $n[h] = 0
+  return h ;end
+||<
+
+*Fib-Heap-Insert
+-接点xの初期化、接点xを根リストに連結
+-key[x]は代入されていて、領域も確保されている。(だと！？)
+-絵も描く
+-木の整理が入らないので計算量が少ない
+-ポテンシャル
+--[tex:t(H') = t(H') + 1, m(H') = m(H) ]
+--増加分
+---[tex:((t(H) + 1) + 2m(H)) - (t(H) + 2m(H))  = 1]
+--ならしコストは[tex: O(1) + 1 = O(1)]
+>|ruby|
+def fib_heap_insert(h, x)
+  $degree[x] = 0
+  $p[x] = nil
+  $child[x] = nil
+  $left[x] = x
+  $right[x] = x
+  $mark[x] = false
+  if $min[h] != nil then concat_root_list($min[h],x) end
+  if $min[h] == nil or $key[x] < $key[$min[h]]
+    then $min[h] = x   ;end
+  $n[h] = $n[h] + 1    ;end
+
+def make_node(x,key)
+  $key[x] = key
+  return x ;end
+
+H = make_fib_heap
+fib_heap_insert(H,make_node(:a,1))
+||<
+
+*Minimum
+-最小接点は min[h] に保持されているので[tex:\Theta(1)] で発見できる
+-ポテンシャルの変化は無い
+>|ruby|
+def fib_heap_minimum(h)
+  return $min[h] ;end
+||<
+
+*Union
+-フィボナッチヒープ H1 と H2 を連結して H を返す
+-根リストを連結して、最小接点 min[H]を決定するだけ
+-ポテンシャル
+--[tex:t(H) = t(H1) + t(H2), m(H) = m(H1) + m(H2) ]
+--増加分
+---[tex:\Phi(H) - (\Phi(H1) + \Phi(H2))]
+---[tex:=(t(H) + 2m(H))-((t(H1) + 2m(H1)) + (t(H2) + 2m(H2))) = 0]
+--ならしコストは[tex: O(1) + 0 = O(1)]
+>|ruby|
+def fib_heap_union(h1,h2)
+  h = make_fib_heap
+  $min[h] = $min[h1]
+  concat_root_list($min[h],$min[h2])
+  if ($min[h1] == nil) or ($min[h2] != nil and ($key[$min[h2]] < $key[$min[h1]]))
+    then $min[h] = $min[h2] ;end
+  $n[h] = $n[h1] + $n[h2]
+  return h ;end
+||<
+
+*Extract-Min
+-最小接点は根リストにある
+-削除される最小接点の子をすべて根リストに
+-Consolidate で整理する
+>|ruby|
+def fib_heap_extract_min(h)
+  z = $min[h]
+  if z != nil then
+    for x in children(z) do
+      add_root_list($min[h],x)
+      $p[x] = nil  ;end
+    delete_from_root_list(z)
+    if z == $right[z] then #根リストに z しか無かった場合
+      $min[h] = nil
+    else
+      $min[h] = $right[z]
+      consolidate(h) ;end
+    $n[h] = $n[h] - 1 ;end
+  return z ;end;
+||<
+
+*Consolidate
+-先延ばしされていた木の整理
+-同じ次数の木がなくなるようにする
+--同じ次数の根、x, yを発見する key[x] =< key[y] を仮定
+--yをx に link
+---y を根リストから削除、y を x の子とする degree[x] を1増やす mark[y]を外す
+
+*Consolidate
+-絵で説明しつつ。
+>|ruby|
+def consolidate(h)
+  a = []
+  0.upto(maxd($n[h])) do
+    a << nil ;end
+  for w in siblings($min[h]) do
+    x = w
+    d = $degree[x]
+    while a[d] != nil do
+      y = a[d]
+      if $key[x] > $key[y] then
+        x, y = y, x ;end
+      fib_heap_link(h,y,x)
+      a[d] = nil
+      d = d + 1 ;end
+    a[d] = x ;end
+  $min[h] = nil
+  0.upto(maxd($n[h])) do |i|
+    if a[i] != nil then
+      if $min[h] == nil or $key[a[i]] < $key[$min[h]] then
+        $min[h] = a[i]   ;end;end;end;end
+
+def fib_heap_link(h,y,x)
+  delete_from_root_list(y)
+  fib_heap_add_child(x,y)
+  $degree[x] = $degree[x] + 1
+  $mark[y] = false ;end
+
+def fib_heap_add_child(x,y)
+  $left[y] = $right[y] = y
+  if child = $child[x] then
+    tmpleft = $left[child]
+    $left[child] = y
+    $right[y] = child
+    $left[y] = tmpleft
+    $right[tmpleft] = y
+  else
+    $child[x] = y ;end
+  $p[y] = x ;end
+||<
+
+*Consolidate
+-ポテンシャルの話
+--Extract_Minで処理する最小接点は高々[tex:D(n)]個の個を持つ
+--Conslidateの1-2行 14-19行が[tex: O(D(n))]を実コストに対して寄与する
+--3-13行のforループ
+---根リストには [tex: t(H)]個の接点がある
+---接点を1つ削除し、削除する接点がもつ高々[tex:D(n)]個の子を挿入する
+---結果、根リストのサイズは [tex: D(n)+t(H)-1]
+---6-12行のwhileループを繰り返すたびに1つの根を他の根に連結
+---forループでの総仕事量は高々[tex: D(n)+t(H)]に比例
+--総実コストは[tex: O(D(n)+t(H))]
+--ポテンシャルの増加分
+---[tex: O(D(n) + t(H)) + ((D(n) + 1) + 2m(h)) - (t(h) + 2m(H))]
+---[tex: = O(D(n)) + O(t(H)) - t(H) = O(D(n))]
+---[tex: D(n) = O(\lg n), O(D(n)) = O(\lg n)]
+
+*Decrease-Key
+-新しいキーをセット
+-min-ヒープ条件が崩れているか調べる
+-崩れていたら整理
+--親より小さくなった接点を根リストに
+--親とのリンクは削除
+--上二つをCutという
+--親がマークされていたら親もCut これを再帰的に
+
+*Decrease-Key
+-コードと絵を見つつ
+>|ruby|
+def fib_heap_decrease_key(h,x,k)
+  if k > $key[x]
+    then rise "新しいキー値は現在のキー値より大きい" ;end
+  $key[x] = k
+  y = $p[x]
+  if y != nil and $key[x] < $key[y] then
+    cut(h,x,y)
+    cascading_cut(h,y) ;end
+  if $key[x] < $key[$min[h]]
+    then $min[h] =x ;end;end
+
+def cut(h,x,y)
+  delete_from_children(x)
+  $degree[y] = $degree[y] -1
+  add_root_list($min[h],x);
+  $p[x] = nil
+  $mark[x] = false ;end
+
+def delete_from_children(child)
+  parent = $p[child]
+  if $child[parent] == child #child ポインタが自分だったら
+    if $left[child] != child
+      $child[parent] = $left[child]
+    else
+      $child[parent] = nil ;end;end
+  left = $left[child]
+  right = $right[child]
+  $right[left] = right
+  $left[right] = left ;end
+
+def cascading_cut(h,y)
+  z = $p[y]
+  if z != nil then
+    if $mark[y] == false then
+      $mark[y] = true
+    else
+      cut(h,y,z)
+      cascading_cut(h,z) ;end;end;end
+||<
+
+**Decrease-Key
+-計算量
+--Cascading-Cutが再帰的にc回行われても、各回は[tex: O(1)]
+--従ってFib-Heap-Decrease-Keyの実コストはすべての再帰呼びだしを含めて[tex: O(c)]
+-ポテンシャル
+--Fib-Heap-Decrease-Key操作直前のヒープをH
+--操作終了後は t(H) + c 個の木
+--m(H) -c + 2 個のマーク
+--変化量
+---[tex: ((t(H) +c) + 2(m(h)-c+2)) - (t(H) + 2m(H)) = 4 -c ]
+--ならしコスト
+---[tex: O(c) + 4 - c = O(1)]
+-マークのコストが2単位なのは
+--1単位は Cut と　マークビットのリセットに
+--1単位は接点 y が根になった時にポテンシャルが1単位増加する事の補償に使う
+
+
+**Fib-Heap-Delete
+-二項ヒープに類似
+-削除したい接点のキーを最小に
+-最小接点削除 を行う
+
+>|ruby|
+Infinit = 9999999999999999999999
+
+def fib_heap_delete(h,x)
+  fib_heap_decrease_key(h,x,-Infinit)
+  fib_heap_extract_min(h) ;end
+||<
+
+**Fib-Heap-Delete,ならしコスト
+-Fib-Heap-Decrease-Key　ならしコスト [tex: O(1)]
+-Fib-Heap-Extract-Min　ならしコスト [tex: O(D(n))]
+-の総和 [O(D(n))=O(\lg n)]
+
+**最大次数の上界
+

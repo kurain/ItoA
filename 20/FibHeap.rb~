@@ -1,0 +1,14 @@
+# -*- coding: utf-8 -*-
+module FibHeap
+  @p = {}        #parent へのポインタ
+  @child = {}    #子へのポインタ
+  @left = {}     #左側の兄弟へのポインタ
+  @right = {}    #右側の兄弟へのポインタ
+  @degree = {}   #次数
+  @mark = {}     #接点の子になった後に子を失ったか？
+  @min = {}      #
+  @n = {}
+  def make_fib_heap
+    
+  end
+end

@@ -1,0 +1,10 @@
+def swap(x,y)
+  tmp = y
+  y = x
+  x = tmp ;end
+
+p a = 1
+p b = 2
+swap(a,b)
+p a
+p b

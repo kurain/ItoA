@@ -1,0 +1,7 @@
+require 'rubygraph'
+
+Rubugraph.init
+
+v1 = Vertex.new
+v2 = Vertex.new
+e12 = Edge.new(v1,v2)
